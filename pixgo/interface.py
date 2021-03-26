@@ -40,9 +40,7 @@ class PixivDefault(object):
 
     # 仅限图片代理，并不会访问pixiv
     imgUrlProxy = "https://i.pixiv.cat"
-
-
-#     https://i.pixiv.cat/c/540x540_70/img-master/img/2021/01/24/02/53/01/87254574_p0_master1200.jpg'
+    # https://i.pixiv.cat/c/540x540_70/img-master/img/2021/01/24/02/53/01/87254574_p0_master1200.jpg'
 
 class PixivHome(PixivDefault):
 
@@ -54,7 +52,7 @@ class PixivHome(PixivDefault):
         return new_session()
 
     # 首页请求接口，返回为字典类型
-    def homePage(self, cookie: str, type: str = settings.DEFAULT_TYPE, mode: str = settings.DEFAULT_MODE) -> dict:
+    def homePage(self, cookie: str, type: str = settings.DEFAULT_TYPE, mode: str = settings.DEFAULT_MODE, isProxy=True) -> dict:
 
         default_type = {
             "illust": "illust",
@@ -72,10 +70,21 @@ class PixivHome(PixivDefault):
         use_mode = default_mode[mode]  # 由配置或前端传来的参数决定
         response = req(url=self.illustHome.format(use_type, use_mode), session=session).json()
         body = response['body']
+
+        # 完成首页排行榜数据
         rank_list = self.home_rank_info(body)
-        rank_list_url_info = self.loadMore_ids(rank_list)
-        print(rank_list_url_info)
-        return {"result": 200, "items": rank_list_url_info}
+        rank_list_info = self.loadMore_ids(rank_list)
+
+        # 加载首页每日推荐数据, 每次刷新就会重新加载新的推荐内容，或单独做成推荐列表展示
+        recommend_list_info = self.loadMore_ids(body['page']['recommend']['ids'])
+
+
+        if isProxy:
+            rank_illusts = self.get_illust_url(rank_list_info, self.imgUrlProxy)
+            recommend_illusts = self.get_illust_url(recommend_list_info, self.imgUrlProxy)
+            return {"result": 200, "rank": rank_illusts, "recommend": recommend_illusts, "items": body}
+        else:
+            pass
 
     def rank(self, mode: str, date: str = None, p: int = 1) -> dict:
 
@@ -95,9 +104,7 @@ class PixivHome(PixivDefault):
         session = self._session
         use_mode = default_mode[mode]
         response = req(url=self.illustRank.format(use_mode, p), session=session).json()
-
         print(response)
-
         return response
 
 
@@ -110,7 +117,7 @@ class PixivHome(PixivDefault):
         rank_ids_lsit = []
         for item in ranking_list:
             rank_ids_lsit.append(item['id'])
-        print(rank_ids_lsit)
+        # print(rank_ids_lsit)
         return rank_ids_lsit
 
     @staticmethod
@@ -123,9 +130,19 @@ class PixivHome(PixivDefault):
         response = req(url=url, params=payload).json()
         return response
 
+    # 使用代理链接加载
     @staticmethod
-    def get_illust_url(load_more):
-        
+    def get_illust_url(load_more, proxy_url):
+        illusts = load_more['body']['illusts']
+        # print(illusts)
+        for i in illusts:
+            if i.get('isAdContainer') == True:
+                illusts.pop(illusts.index(i))
+                continue
+            else:
+                i['url'] = proxy_url + i['url'][len(proxy_url):]
+                i['profileImageUrl'] = proxy_url + i['profileImageUrl'][len(proxy_url):]
+        return illusts
 
 
 

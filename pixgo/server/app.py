@@ -154,7 +154,7 @@ def rank():
     # print(data_info)
     response = PixivHome().rank(mode=data_info['mode'])
     # print(response)
-    return {"result": 200}
+    return response
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=5000)
