@@ -5,8 +5,8 @@ sys.path.append("/home/demo-project")
 
 from flask import Flask, request
 from flask_cors import CORS
-from pixivgo.pixgo.interface import PixivIllusts, PixivIllustCommend, PixivHome
-from pixivgo.pixgo.userInterface import UserLogin
+from pixgo.interface import PixivIllusts, PixivIllustCommend, PixivHome
+from pixgo.userInterface import UserLogin
 # from pixgo.interface import Illusts, IllustCommend
 # from pixgo.userInterface import UserLogin
 
@@ -111,8 +111,8 @@ def _login():
 def recommend_illust_more():
     """
     postInfo:   page_num => int
-            page_size => int
-            nextIds => list
+                page_size => int
+                nextIds => list
     :return:
     """
     proxy_url = "https://i.pixiv.cat"

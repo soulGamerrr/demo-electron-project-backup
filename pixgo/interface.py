@@ -1,8 +1,10 @@
 import base64
 import json
 import pickle
+import time
 import sys
 import threading
+import gevent
 from typing import List
 
 sys.path.append("pixgo")
@@ -32,6 +34,7 @@ class PixivDefault(object):
     dailyRecommend = None
     relativeRecommend = "https://www.pixiv.net/ajax/illust/{}/recommend/init?"
     recommendMore = "https://www.pixiv.net/ajax/illust/recommend/illusts?"
+    userInfoUrl = "https://www.pixiv.net/ajax/user/{}?full=1&lang=zh"
     recommendParams = {
         "limit": 20,
         "lang": "zh"
@@ -68,21 +71,59 @@ class PixivHome(PixivDefault):
         session.headers['Cookie'] = cookie
         use_type = default_type[type]  # 由配置或前端传来的参数决定
         use_mode = default_mode[mode]  # 由配置或前端传来的参数决定
+        start = time.time()
         response = req(url=self.illustHome.format(use_type, use_mode), session=session).json()
         body = response['body']
 
-        # 完成首页排行榜数据
         rank_list = self.home_rank_info(body)
-        rank_list_info = self.loadMore_ids(rank_list)
 
+
+
+        # 获取推荐用户的简要信息
+
+        more_illusts = []
+        num_of_users = len(body['page']['recommendUser'])
+        for i in range(num_of_users):
+            illustIds = body['page']['recommendUser'][i]["illustIds"]
+            more_illusts.extend(illustIds)
+
+        # 方法2: 直接调用 loadMore 的方法
+        # 完成推荐用户的数据整合
+        response_recommend_user_list_info = self.loadMore_ids(more_illusts, "recommendUser")['response']
+        # 完成首页排行榜数据
+        response_rank_list_info = self.loadMore_ids(rank_list, "rank")['response']
         # 加载首页每日推荐数据, 每次刷新就会重新加载新的推荐内容，或单独做成推荐列表展示
-        recommend_list_info = self.loadMore_ids(body['page']['recommend']['ids'])
+        response_recommend_list_info = self.loadMore_ids(body['page']['recommend']['ids'], "recommend")['response']
+
+        # 方法1(保留).使用协程的方式同时对这个方法进行调用  运行时间 2.3025234234s  大约2s左右完成调用
+
+        # g_list = gevent.joinall([gevent.spawn(self.loadMore_ids, rank_list, "rank"),
+        #                 gevent.spawn(self.loadMore_ids, body['page']['recommend']['ids'], "recommend"),
+        #                 gevent.spawn(self.loadMore_ids, more_illusts, "recommendUser")])
+        # print(response_recommend_list_info, response_rank_list_info, response_recommend_user_list_info)
+        # for i in g_list:
+        #     # print(i)
+        #     print("请求结果", i.value)
+
+        end = time.time()
+        print("总计用时 %s" % (end - start))
+
+        # ************************************** 以上为方法 1 ********************************************* #
+
+        # 对recommend_user_list_info进行数据处理
+        
+        recommend_user = self.get_user_info(response_recommend_user_list_info, self.imgUrlProxy)
+
+
 
 
         if isProxy:
-            rank_illusts = self.get_illust_url(rank_list_info, self.imgUrlProxy)
-            recommend_illusts = self.get_illust_url(recommend_list_info, self.imgUrlProxy)
-            return {"result": 200, "rank": rank_illusts, "recommend": recommend_illusts, "items": body}
+            # ----------------------------------------------暂时注释 ---------------------------------------------------
+            rank_illusts = self.get_illust_url(response_rank_list_info, self.imgUrlProxy)
+            recommend_illusts = self.get_illust_url(response_recommend_list_info, self.imgUrlProxy)
+            return {"result": 200, "rank": rank_illusts, "recommend": recommend_illusts, "items": body,
+                    "recommend_user": recommend_user}
+            # return {"result": 200, "recommend_user": recommend_user}
         else:
             pass
 
@@ -120,17 +161,20 @@ class PixivHome(PixivDefault):
         # print(rank_ids_lsit)
         return rank_ids_lsit
 
+    # 按照插画的id进行更多的加载方式
     @staticmethod
-    def loadMore_ids(rank_list: list):
+    def loadMore_ids(rank_list: list, type:str):
         payload = {
             "illust_ids[]": []
         }
         url = "https://www.pixiv.net/ajax/illust/recommend/illusts?"
         payload['illust_ids[]'].append(rank_list)
         response = req(url=url, params=payload).json()
-        return response
+        return {"response": response, "request_type": type}
 
-    # 使用代理链接加载
+
+
+    # 使用代理链接替换原图片链接
     @staticmethod
     def get_illust_url(load_more, proxy_url):
         illusts = load_more['body']['illusts']
@@ -143,6 +187,42 @@ class PixivHome(PixivDefault):
                 i['url'] = proxy_url + i['url'][len(proxy_url):]
                 i['profileImageUrl'] = proxy_url + i['profileImageUrl'][len(proxy_url):]
         return illusts
+
+    @staticmethod
+    def get_user_info(resp: dict, proxy_url):
+
+        user_data = {
+            "userId": "",
+            "illusts": []
+        }
+
+        user_data_list = list()
+        user_id_list = []
+        body = resp['body']['illusts']
+
+        for id in body:
+            if id.get("isAdContainer") == True:
+                resp['body']['illusts'].pop(resp['body']['illusts'].index(id))
+                continue
+            # print(id.get('userId'))
+            if id.get('userId') in user_id_list:
+                continue
+            else:
+                user_id_list.append(id['userId'])
+        for i in body:
+            if i.get("isAdContainer") == True:
+                resp['body']['illusts'].pop(resp['body']['illusts'].index(i))
+                continue
+            else:
+
+                i['url'] = proxy_url + i['url'][len(proxy_url):]
+                if re.search(r"user-profile", i['profileImageUrl']) == None:
+                    continue
+                i['profileImageUrl'] = proxy_url + i['profileImageUrl'][len(proxy_url):]
+
+                i["profileImageUrl"] = i['profileImageUrl'].replace("_50.", "_170.")
+
+        return {"userIdList": user_id_list, "body": body}
 
 
 
