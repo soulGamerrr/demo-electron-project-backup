@@ -35,6 +35,7 @@ class PixivDefault(object):
     relativeRecommend = "https://www.pixiv.net/ajax/illust/{}/recommend/init?"
     recommendMore = "https://www.pixiv.net/ajax/illust/recommend/illusts?"
     userInfoUrl = "https://www.pixiv.net/ajax/user/{}?full=1&lang=zh"
+    userIllustsInfo = "https://www.pixiv.net/ajax/user/{}/profile/top?lang=zh"
     recommendParams = {
         "limit": 20,
         "lang": "zh"
@@ -45,6 +46,7 @@ class PixivDefault(object):
     imgUrlProxy = "https://i.pixiv.cat"
     # https://i.pixiv.cat/c/540x540_70/img-master/img/2021/01/24/02/53/01/87254574_p0_master1200.jpg'
 
+# 首页排行，推荐用户，每日推荐
 class PixivHome(PixivDefault):
 
     def __init__(self):
@@ -115,12 +117,10 @@ class PixivHome(PixivDefault):
         recommend_user = self.get_user_info(response_recommend_user_list_info, self.imgUrlProxy)
 
 
-
-
         if isProxy:
             # ----------------------------------------------暂时注释 ---------------------------------------------------
-            rank_illusts = self.get_illust_url(response_rank_list_info, self.imgUrlProxy)
-            recommend_illusts = self.get_illust_url(response_recommend_list_info, self.imgUrlProxy)
+            rank_illusts = self.proxyUrl(response_rank_list_info, self.imgUrlProxy)
+            recommend_illusts = self.proxyUrl(response_recommend_list_info, self.imgUrlProxy)
             return {"result": 200, "rank": rank_illusts, "recommend": recommend_illusts, "items": body,
                     "recommend_user": recommend_user}
             # return {"result": 200, "recommend_user": recommend_user}
@@ -176,7 +176,7 @@ class PixivHome(PixivDefault):
 
     # 使用代理链接替换原图片链接
     @staticmethod
-    def get_illust_url(load_more, proxy_url):
+    def proxyUrl(load_more, proxy_url):
         illusts = load_more['body']['illusts']
         # print(illusts)
         for i in illusts:
@@ -393,3 +393,66 @@ class PixivIllustCommend(PixivDefault):
             payload['illust_ids[]'].append(nextIds[page_size * (page_num - 1): page_size * page_num])
         response = req(url=self.recommendMore, params=payload).json()
         return response
+
+
+
+class PixivUser(PixivDefault):
+
+    def __init__(self, userId):
+
+        self.userId = userId
+        super().__init__()
+
+    @property
+    def _session(self):
+        return new_session()
+
+    def getUserInfo(self, cookie: str):
+
+        user_url = self.userInfoUrl.format(self.userId)
+        user_top_url = self.userIllustsInfo.format(self.userId)
+        session = self._session
+        session.headers['Cookie'] = cookie
+        userInfo = self.userinfo_proxy_url(req(url=user_url, session=session).json(), self.imgUrlProxy)
+
+        userIllusts = self.getUserIllusts(user_top_url, session)
+        userIllusts_proxy = self.illusts_proxy_url(userIllusts, self.imgUrlProxy)
+
+        return {"result": 200, "userInfo": userInfo, "userIllusts": userIllusts_proxy}
+        # return {"result": 200}
+
+
+    def getUserIllusts_Ex(self, cookie:str):
+
+        user_top_url = self.userIllustsInfo.format(self.userId)
+        session = self._session
+        session.headers['Cookie'] = cookie
+        userIllusts = req(url=user_top_url, session=session).json()
+        return userIllusts
+
+
+    @staticmethod
+    def getUserIllusts(url, session):
+        response = req(url=url, session=session).json()
+        return response
+
+
+    @staticmethod
+    def userinfo_proxy_url(res: dict, proxy_url):
+        user = res['body']
+        # print(illusts)
+        user['imageBig'] = proxy_url + user['imageBig'][len(proxy_url):]
+        user['image'] = proxy_url + user["image"][len(proxy_url):]
+        return res
+
+
+
+    @staticmethod
+    def illusts_proxy_url(res: dict, proxy_url):
+        illusts = res['body']['illusts']
+        for i in illusts:
+
+            illusts[i]['url'] = proxy_url + illusts[i]['url'][len(proxy_url):]
+            # print(illusts[i]['url'])
+            # i['profileImageUrl'] = proxy_url + i['profileImageUrl'][len(proxy_url):]
+        return illusts

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import sys
 #
@@ -5,8 +6,8 @@ sys.path.append("/home/demo-project")
 
 from flask import Flask, request
 from flask_cors import CORS
-from pixgo.interface import PixivIllusts, PixivIllustCommend, PixivHome
-from pixgo.userInterface import UserLogin
+from pixgo.interface import PixivIllusts, PixivIllustCommend, PixivHome, PixivUser
+from pixgo.userInterface import UserLogin, PeteerLogin
 # from pixgo.interface import Illusts, IllustCommend
 # from pixgo.userInterface import UserLogin
 
@@ -30,7 +31,9 @@ def get_json_info():
 
 @app.route("/", methods=['GET', "POST"])
 def home():
-    print(request.base_url)
+    c = PeteerLogin()
+    c.start()
+
     return "Hello"
 
 
@@ -155,6 +158,23 @@ def rank():
     response = PixivHome().rank(mode=data_info['mode'])
     # print(response)
     return response
+
+
+@app.route("/user", methods=['POST'])
+def user():
+    data_info = get_json_info()
+
+    response = PixivUser(data_info['userId']).getUserInfo(data_info['cookie'])
+    return response
+
+
+@app.route("/userIllusts", methods=['POST'])
+def userIllusts():
+    data_info = get_json_info()
+
+    response = PixivUser(data_info['userId']).getUserIllusts_Ex(data_info['cookie'])
+    return response
+
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=5000)
