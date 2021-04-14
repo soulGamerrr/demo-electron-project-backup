@@ -1,13 +1,15 @@
 """
     此模块针对url响应的一些信息进行解析并组装
 """
+import sys
+
 import os
 import re
 import time
 import logging
 import requests
 
-from . import settings
+from . import default_setting
 from . import httpError
 
 from logging import handlers
@@ -32,7 +34,7 @@ class Logger(object):
             level = level.upper()
 
         if dirname == None:
-            dirname = settings.LOG_SAVE_FILE_PATH
+            dirname = default_setting.LOG_SAVE_FILE_PATH
 
         if os.path.exists(dirname):
             pass
@@ -62,7 +64,7 @@ class Logger(object):
             self.logger.addHandler(self.th)
 
     # 传入文本内容为自定义写日志内容
-    def log(self, text, level=settings.LOG_INFO):
+    def log(self, text, level=default_setting.LOG_INFO):
 
         if not level.isupper():
             level = level.upper()
@@ -93,8 +95,8 @@ class Logger(object):
 
 
 # 封装requests
-def req(url, req_type="get", session=None, headers=settings.DEFAULT_HEADER_HANDLER,
-        timeout=settings.TIMEOUT, reties=settings.MAX_RETRIES_REQUESTS, requester=None, data=None, params=None):
+def req(url, req_type="get", session=None, headers=default_setting.DEFAULT_HEADER_HANDLER,
+        timeout=default_setting.TIMEOUT, reties=default_setting.MAX_RETRIES_REQUESTS, requester=None, data=None, params=None):
     logged = Logger("request.log")
     curr_reties = 1
     req_type = req_type.upper()
@@ -126,20 +128,20 @@ def req(url, req_type="get", session=None, headers=settings.DEFAULT_HEADER_HANDL
 
         except requests.exceptions.Timeout as e:
             logged.log("重试次数：%s " % curr_reties + "请求连接超时.... "
-                                                  "Wait for {} seconds and try again".format(settings.REQUESTS_DELAY))
+                                                  "Wait for {} seconds and try again".format(default_setting.REQUESTS_DELAY))
             print("重试次数：%s" % curr_reties, "请求连接超时", e)
         except requests.exceptions.ConnectionError as e:
             logged.log("重试次数：%s " % curr_reties + "连接错误.... "
-                                                  "Wait for {} seconds and try again".format(settings.REQUESTS_DELAY))
+                                                  "Wait for {} seconds and try again".format(default_setting.REQUESTS_DELAY))
             # print("重试次数：%s" % curr_reties, "连接错误", e)
         except requests.exceptions.RequestException as e:
             logged.log("重试次数：%s " % curr_reties + "请求错误.... "
-                                                  "Wait for {} seconds and try again".format(settings.REQUESTS_DELAY))
+                                                  "Wait for {} seconds and try again".format(default_setting.REQUESTS_DELAY))
             print("重试次数：%s" % curr_reties, "请求错误", e)
 
         curr_reties += 1
         # 等待一秒后重新尝试
-        time.sleep(settings.REQUESTS_DELAY)
+        time.sleep(default_setting.REQUESTS_DELAY)
 
     raise requests.exceptions.RetryError
 
@@ -190,7 +192,7 @@ def write(url, headers, timeout, savePath=None, fileName=None):
     fileName = url.split("/")[-1]
     print("写入文件路径 %s" % savePath)
     if not savePath:
-        savePath = settings.DEFAULT_ILLUST_SAVE_PATH
+        savePath = default_setting.DEFAULT_ILLUST_SAVE_PATH
     if os.path.exists(savePath):
         print("文件夹存在")
     else:

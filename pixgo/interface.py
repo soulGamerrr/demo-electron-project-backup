@@ -40,7 +40,7 @@ class PixivDefault(object):
         "limit": 20,
         "lang": "zh"
     }
-    headers = settings.DEFAULT_HEADER_HANDLER
+    headers = default_setting.DEFAULT_HEADER_HANDLER
 
     # 仅限图片代理，并不会访问pixiv
     imgUrlProxy = "https://i.pixiv.cat"
@@ -57,7 +57,7 @@ class PixivHome(PixivDefault):
         return new_session()
 
     # 首页请求接口，返回为字典类型
-    def homePage(self, cookie: str, type: str = settings.DEFAULT_TYPE, mode: str = settings.DEFAULT_MODE, isProxy=True) -> dict:
+    def homePage(self, cookie: str, type: str = default_setting.DEFAULT_TYPE, mode: str = default_setting.DEFAULT_MODE, isProxy=True) -> dict:
 
         default_type = {
             "illust": "illust",
@@ -76,7 +76,7 @@ class PixivHome(PixivDefault):
         start = time.time()
         response = req(url=self.illustHome.format(use_type, use_mode), session=session).json()
         body = response['body']
-
+        # print(body)
         rank_list = self.home_rank_info(body)
 
 
@@ -121,6 +121,7 @@ class PixivHome(PixivDefault):
             # ----------------------------------------------暂时注释 ---------------------------------------------------
             rank_illusts = self.proxyUrl(response_rank_list_info, self.imgUrlProxy)
             recommend_illusts = self.proxyUrl(response_recommend_list_info, self.imgUrlProxy)
+
             return {"result": 200, "rank": rank_illusts, "recommend": recommend_illusts, "items": body,
                     "recommend_user": recommend_user}
             # return {"result": 200, "recommend_user": recommend_user}
@@ -178,14 +179,18 @@ class PixivHome(PixivDefault):
     @staticmethod
     def proxyUrl(load_more, proxy_url):
         illusts = load_more['body']['illusts']
-        # print(illusts)
+
         for i in illusts:
+
             if i.get('isAdContainer') == True:
                 illusts.pop(illusts.index(i))
                 continue
             else:
                 i['url'] = proxy_url + i['url'][len(proxy_url):]
                 i['profileImageUrl'] = proxy_url + i['profileImageUrl'][len(proxy_url):]
+        for i in illusts:
+            if i.get('url')[:len(proxy_url)] == "https://i.pximg.net":
+                illusts.pop(illusts.index(i))
         return illusts
 
     @staticmethod
@@ -369,7 +374,7 @@ class PixivIllustCommend(PixivDefault):
 
         # 启动多线程，允许每次执行的最大数量
         # 将图片加入线程队列
-        semaphore = threading.BoundedSemaphore(settings.MAX_THREADING_NUM)
+        semaphore = threading.BoundedSemaphore(default_setting.MAX_THREADING_NUM)
         threads = []
         for m in urllist:
             if m != None:
@@ -398,6 +403,12 @@ class PixivIllustCommend(PixivDefault):
 
 class PixivUser(PixivDefault):
 
+    """
+        获取pixiv用户信息
+        不需要传入cookie
+    """
+
+
     def __init__(self, userId):
 
         self.userId = userId
@@ -407,12 +418,12 @@ class PixivUser(PixivDefault):
     def _session(self):
         return new_session()
 
-    def getUserInfo(self, cookie: str):
+    def getUserInfo(self):
 
         user_url = self.userInfoUrl.format(self.userId)
         user_top_url = self.userIllustsInfo.format(self.userId)
         session = self._session
-        session.headers['Cookie'] = cookie
+        # session.headers['Cookie'] = cookie
         userInfo = self.userinfo_proxy_url(req(url=user_url, session=session).json(), self.imgUrlProxy)
 
         userIllusts = self.getUserIllusts(user_top_url, session)

@@ -5,15 +5,15 @@ import json
 import requests
 import random
 
-from pixgo import settings
+from pixgo import default_setting
 # from .parsing import _rule_find_img_detail, write
 
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-filePath = settings.ILLUST_FOLDER_SAVE
-timeout = settings.TIMEOUT
+filePath = default_setting.ILLUST_FOLDER_SAVE
+timeout = default_setting.TIMEOUT
 #
 #
 # def downloadOne(url, imgId, headers):

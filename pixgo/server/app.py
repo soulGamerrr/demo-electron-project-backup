@@ -8,8 +8,8 @@ from flask import Flask, request
 from flask_cors import CORS
 from pixgo.interface import PixivIllusts, PixivIllustCommend, PixivHome, PixivUser
 from pixgo.userInterface import UserLogin, PeteerLogin
-# from pixgo.interface import Illusts, IllustCommend
-# from pixgo.userInterface import UserLogin
+
+
 
 app = Flask(__name__)
 
@@ -164,7 +164,7 @@ def rank():
 def user():
     data_info = get_json_info()
 
-    response = PixivUser(data_info['userId']).getUserInfo(data_info['cookie'])
+    response = PixivUser(data_info['userId']).getUserInfo()
     return response
 
 
